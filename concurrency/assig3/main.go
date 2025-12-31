@@ -6,10 +6,9 @@ import (
 	"time"
 )
 
-
 func worker(url string, resultCh chan<- string, wg *sync.WaitGroup) {
 	defer wg.Done()
-	time.Sleep(time.Millisecond * 10)
+	time.Sleep(time.Millisecond * 50)
 
 	fmt.Printf("image processed: %s\n", url)
 	resultCh <- url
@@ -17,20 +16,24 @@ func worker(url string, resultCh chan<- string, wg *sync.WaitGroup) {
 
 func main() {
 	var wg sync.WaitGroup
-	resultCh := make(chan string)
+	resultCh := make(chan string, 10)
 	startTime := time.Now()
-	for i := range 100 {
-		url := fmt.Sprint(i) + "_image.png"
+
+	for i := range 10 {
+		url := fmt.Sprintf("%d_image.png", i)
 		wg.Add(1)
 		go worker(url, resultCh, &wg)
-		fmt.Println(<-resultCh)
+	}
+	// fan out/ fan in
+	// Close resultCh when all workers are done, so ranging over it can finish.
+	go func() {
+		wg.Wait()
+		close(resultCh)
+	}()
+
+	for result := range resultCh {
+		fmt.Printf("received: %s\n", result)
 	}
 
-	
-	wg.Wait()
-
-	close(resultCh)
-
-
-	fmt.Printf("it took %s \n", time.Since(startTime))
+	fmt.Printf("it took %s\n", time.Since(startTime))
 }
